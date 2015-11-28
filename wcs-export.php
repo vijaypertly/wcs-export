@@ -34,7 +34,4 @@ add_action( 'admin_enqueue_scripts', array('WCSExport', 'wcsWcAfrScripts') );
 add_filter( "plugin_action_links_".WCS_EXPORT_PLUGIN_BASENAME, array('WCSExport', 'pluginSettingsLink') );
 add_action( 'admin_menu', array('WCSExport', 'pluginAdminLinks') );
 
-
-
-
 ?>
