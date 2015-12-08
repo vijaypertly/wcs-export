@@ -99,7 +99,7 @@ if(!empty($_POST)){
     WCSExport::notifyMess($arrNMess); $arrNMess = array();*/
 }
 if(!empty($_GET['erms'])){
-    $arrErs = explode(',', $_GET['erms']);
+    $arrErs = explode(',', $_GET['erms']);	
     $arrErrs = array(
         '1'=>'Invalid date for start date. Date format should be YYYY-mm-dd.',
         '2'=>'Invalid date format for start date. Date format should be YYYY-mm-dd',
@@ -110,6 +110,8 @@ if(!empty($_GET['erms'])){
         '7'=>'If offset records set, make sure it should be greater than or equal to zero.',
         '8'=>'No records found.',
         '9'=>'Please try again later.',
+		'10'=>'If Orders ID set, make sure it should be greater than zero.',
+		'11'=>'Please select the appropriate option in Orders should be',
     );
     if(!empty($arrErs)){
         foreach($arrErs as $erC){
@@ -179,6 +181,26 @@ if(!empty($_GET['erms'])){
                     </th>
                     <td>
                         <input type="number" value="" name="offset_records" />
+                    </td>
+                </tr>
+                <tr class="form-field form-required">
+                    <th scope="row">
+                        <label for="orders_option">Orders Should be </label>
+                    </th>
+                    <td>
+                        <select name="orders_option">
+                            <option value="">-- Select --</option>
+                            <option value=">">Greater Than(>)</option>
+                            <option value="<">Less than(<)</option>                            
+                        </select>
+                    </td>
+                </tr>
+                <tr class="form-field form-required">
+                    <th scope="row">
+                        <label for="orders_id">Orders ID </label>
+                    </th>
+                    <td>
+                        <input type="number" value="" name="orders_id" />
                     </td>
                 </tr>
 

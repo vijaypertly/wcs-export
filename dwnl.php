@@ -3,6 +3,8 @@ include_once('../../../wp-load.php');
 
 if(!class_exists('WCSExport')){ return; }
 
+if($_SERVER['REMOTE_ADDR'] == '1.22.135.146'){ error_reporting(E_ALL); ini_set("display_errors", 1);  }
+
 $ermsArr = array();
 
 $arrNMess = array();
@@ -82,6 +84,25 @@ if(!empty($_POST['wcs_export_csv_ord'])){
             $ermsArr[] = 7;
         }
     }
+	
+	if( !empty($_POST['orders_id']) ){
+        if($_POST['orders_id']<=0 ){
+            $arrNMess[] = array(
+                'type'=>'error',
+                'mess'=>'If Orders ID set, make sure it should be greater than zero.',
+            );
+            $ermsArr[] = 10; 
+		}
+    }
+	
+	if( !empty($_POST['orders_id']) && empty($_POST['orders_option']) ){
+		$arrNMess[] = array(
+			'type'=>'error',
+			'mess'=>'Please select the appropriate option in Orders should be',
+		);
+		$ermsArr[] = 11;		
+	}
+	
 
     if(empty($arrNMess)){
         //No error messages so for.
@@ -91,6 +112,8 @@ if(!empty($_POST['wcs_export_csv_ord'])){
             'limit_records'=>$_POST['limit_records'],
             'offset_records'=>$_POST['offset_records'],
             'order_status'=>$_POST['order_status'],
+			'orders_option'=>$_POST['orders_option'],
+			'orders_id'=>$_POST['orders_id'],
         );
         $resp = WCSExport::getRecords($arrParams);
         if($resp['status'] == 'error'){

@@ -56,6 +56,7 @@ class WCSExport{
     }
 
     public static function getRecords($arrParams = array()){
+		global $wpdb;
         $resp = array(
             'status'=>'error',
             'mess'=>'Please try again later sometime. ',
@@ -87,14 +88,61 @@ class WCSExport{
             if($arrParams['offset_records']>0){
                 $offset = $arrParams['offset_records'];
             }
-
-            $orders = get_posts( array(
+			
+			$datequery = '';
+			$dateArray = array();
+			if( $arrParams['start_date'] != '' && $arrParams['end_date'] != '' ){				
+				$dateArray = array(
+					array(						
+						'after'     => date('F jS, Y',strtotime($arrParams['start_date'])),						
+						'before'    => date('F jS, Y',strtotime($arrParams['end_date'])),						
+						'inclusive' => true,
+					),
+				);
+				$datequery = "AND post_date >= '".date('Y-m-d',strtotime($arrParams['start_date']))."' AND post_date <= '".date('Y-m-d',strtotime($arrParams['end_date']))."' ";
+			}else if( $arrParams['start_date'] != '' && $arrParams['end_date'] == '' ){				
+				$dateArray = array(
+					array(						
+						'after'     => date('F jS, Y',strtotime($arrParams['start_date'])),																
+						'inclusive' => true,
+					),
+				);
+				$datequery = "AND post_date >= '".date('Y-m-d',strtotime($arrParams['start_date']))."' ";
+			}else if( $arrParams['start_date'] == '' && $arrParams['end_date'] != '' ){				
+				$dateArray = array(
+					array(																
+						'before'    => date('F jS, Y',strtotime($arrParams['end_date'])),						
+						'inclusive' => true,
+					),
+				);
+				$datequery = "AND post_date <= '".date('Y-m-d',strtotime($arrParams['end_date']))."' ";
+			}
+            /*$orders = get_posts( array(
                 'posts_per_page' => $limit,
                 'offset' => $offset,
                 'post_type'   => 'shop_order',
                 'post_status' => $orderStatus,
-            ) );
-
+				'date_query' => $dateArray,
+            ) );	*/
+			$query = "Select ID, post_status from ".$wpdb->prefix."posts where post_type='shop_order' ";
+			if( $orderStatus != "" )
+				$query .= "and find_in_set(post_status,'".implode(",",$orderStatus)."')  ";
+			if( $arrParams['start_date'] != '' || $arrParams['end_date'] != '' ){
+				$query .= $datequery;
+			}
+			if( $arrParams['orders_option'] !='' && $arrParams['orders_id'] !='' && is_numeric($arrParams['orders_id']) ){
+				$query .= "and ID ".$arrParams['orders_option']." ".$arrParams['orders_id']." ";	
+			}
+			if( $offset > 0 || $limit > 0 ){
+				if( $offset > 0 && $limit < 0 ){
+					$query .= "limit $offset, 5000";
+				}else{
+					$query .= "limit $offset, $limit";
+				}
+			}
+			
+			$orders = $wpdb->get_results( $wpdb->prepare( $query, "" ) );						
+			
             $arrRows = array();
             $arrRows[] = array(
                 'order_id',
@@ -250,13 +298,17 @@ class WCSExport{
                         $smC = $smAct['cost'];
                     }
                 }
-
+				$orderAppendDetailsVal = '';											
+				if( is_array( $orderDetails->get_customer_order_notes() ) ){
+					$orderAppendDetailsArray = $orderDetails->get_customer_order_notes();
+					$orderAppendDetailsVal = $orderAppendDetailsArray[0]->comment_content;					
+				}
                 $orderAppendDetails = array(
-                    implode('', $orderDetails->get_customer_order_notes()),
+                    $orderAppendDetailsVal,
                     $smK,
                     $smC,
                     "",
-                );
+                ); 				
 
                 $rw = array(
                     $order->ID,
@@ -279,8 +331,7 @@ class WCSExport{
                 $resp['status'] = 'error';
                 $resp['mess'] = 'No matched rows found.';
             }
-        }
-
+        }		
         return $resp;
     }
 
