@@ -300,10 +300,10 @@ class WCSExport{
                 $orderItemHtml = "";
 
                 $orderItemsArr = $orderDetails->get_items();
+                $totalItemsForOrder = 0;
                 if(!empty($orderItemsArr)){
                     $itemHtml = array();
                     $itemValOld = array();
-                    $totalItemsForOrder = 0;
 
                     foreach($orderItemsArr as $itemDetails){
                         $pid = !empty($itemDetails['variation_id'])?$itemDetails['variation_id']:$itemDetails['product_id'];
@@ -324,11 +324,11 @@ class WCSExport{
                         $totalItemsForOrder++;
                     }
 
-                    for($i=$totalItemsForOrder; $i<=$maxItemCount; $i++){
-                        $itemValOld[] = '';
-                    }
-
                     $orderItemHtml = implode("\n", $itemHtml);
+                }
+
+                for($i=$totalItemsForOrder; $i<$maxItemCount; $i++){
+                    $itemValOld[] = '';
                 }
 
                 /*$orderItems = array(
