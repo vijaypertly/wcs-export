@@ -129,35 +129,39 @@ class WCSExport{
 				'date_query' => $dateArray,
             ) );	*/
 			$query = "Select ID, post_status from ".$wpdb->prefix."posts where post_type='shop_order' ";
-			$queryMaxItems = "Select count(*) as cnt from ".$wpdb->prefix."posts as posts, ".$wpdb->prefix."woocommerce_order_items as items where posts.post_type='shop_order' ";
+            $queryMaxItems = "SELECT a.cnt FROM ( Select ID, (select count(*) from ".$wpdb->prefix."woocommerce_order_items WHERE order_item_type='line_item' AND order_id=`".$wpdb->prefix."posts`.ID GROUP BY order_id )as cnt from ".$wpdb->prefix."posts where post_type='shop_order' ";
 			if( $orderStatus != "" )
 				$query .= "and find_in_set(post_status,'".implode(",",$orderStatus)."')  ";
-            $queryMaxItems .= "and find_in_set(posts.post_status,'".implode(",",$orderStatus)."')  ";
+            $queryMaxItems .= "and find_in_set(post_status,'".implode(",",$orderStatus)."')  ";
 			if( $arrParams['start_date'] != '' || $arrParams['end_date'] != '' ){
 				$query .= $datequery;
-                $queryMaxItems .= $datequeryMaxItems;
+                $queryMaxItems .= $datequery;
 			}
 			if( $arrParams['orders_option'] !='' && $arrParams['orders_id'] !='' && is_numeric($arrParams['orders_id']) ){
 				$query .= "and ID ".$arrParams['orders_option']." ".$arrParams['orders_id']." ";
-                $queryMaxItems .= "and posts.ID ".$arrParams['orders_option']." ".$arrParams['orders_id']." ";
+                $queryMaxItems .= "and ID ".$arrParams['orders_option']." ".$arrParams['orders_id']." ";
 			}
 
-            $queryMaxItems .= " AND items.order_id = posts.ID AND items.order_item_type = 'line_item' GROUP BY items.order_id ORDER BY cnt DESC LIMIT 1";
 
 			if( $offset > 0 || $limit > 0 ){
 				if( $offset > 0 && $limit < 0 ){
 					$query .= "limit $offset, 5000";
+                    $queryMaxItems .= "limit $offset, 5000";
 				}else{
 					$query .= "limit $offset, $limit";
+                    $queryMaxItems .= "limit $offset, $limit";
 				}
 			}
-			
+
+            $queryMaxItems .= " ) as a ORDER BY a.cnt DESC LIMIT 1 ";
+
 			//$orders = $wpdb->get_results( $wpdb->prepare( $query, "" ) );
             /*Commented the above line: as we got warning <b>Notice</b>:  wpdb::prepare was called <strong>incorrectly</strong>. The query argument of wpdb::prepare() must have a placeholder. Please see <a href="https://codex.wordpress.org/Debugging_in_WordPress">Debugging in WordPress</a> for more information. (This message was added in version 3.9.) in <b>/var/www/html/wordpress_test/wp-includes/functions.php</b> on line <b>3622</b><br />*/
 			$orders = $wpdb->get_results($query);
 			$maxItemCount = $wpdb->get_var($queryMaxItems);
+            //echo $query."<br />".$queryMaxItems;exit;
 
-			$ordersTotal = $wpdb->get_results($queryMaxItems);
+			//$ordersTotal = $wpdb->get_results($queryMaxItems);
             $orderItemsCol = array();
             for($i=1; $i<=$maxItemCount; $i++){
                 $orderItemsCol[] = 'order_item_'.$i;
