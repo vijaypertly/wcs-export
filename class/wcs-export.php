@@ -90,6 +90,7 @@ class WCSExport{
             }
 			
 			$datequery = '';
+            $datequeryMaxItems = '';
 			$dateArray = array();
 			if( $arrParams['start_date'] != '' && $arrParams['end_date'] != '' ){				
 				$dateArray = array(
@@ -100,7 +101,8 @@ class WCSExport{
 					),
 				);
 				$datequery = "AND post_date >= '".date('Y-m-d',strtotime($arrParams['start_date']))."' AND post_date <= '".date('Y-m-d',strtotime($arrParams['end_date']))."' ";
-			}else if( $arrParams['start_date'] != '' && $arrParams['end_date'] == '' ){				
+                $datequeryMaxItems = "AND posts.post_date >= '".date('Y-m-d',strtotime($arrParams['start_date']))."' AND posts.post_date <= '".date('Y-m-d',strtotime($arrParams['end_date']))."' ";
+			}else if( $arrParams['start_date'] != '' && $arrParams['end_date'] == '' ){
 				$dateArray = array(
 					array(						
 						'after'     => date('F jS, Y',strtotime($arrParams['start_date'])),																
@@ -108,7 +110,8 @@ class WCSExport{
 					),
 				);
 				$datequery = "AND post_date >= '".date('Y-m-d',strtotime($arrParams['start_date']))."' ";
-			}else if( $arrParams['start_date'] == '' && $arrParams['end_date'] != '' ){				
+                $datequeryMaxItems = "AND posts.post_date >= '".date('Y-m-d',strtotime($arrParams['start_date']))."' ";
+			}else if( $arrParams['start_date'] == '' && $arrParams['end_date'] != '' ){
 				$dateArray = array(
 					array(																
 						'before'    => date('F jS, Y',strtotime($arrParams['end_date'])),						
@@ -116,6 +119,7 @@ class WCSExport{
 					),
 				);
 				$datequery = "AND post_date <= '".date('Y-m-d',strtotime($arrParams['end_date']))."' ";
+                $datequeryMaxItems = "AND posts.post_date <= '".date('Y-m-d',strtotime($arrParams['end_date']))."' ";
 			}
             /*$orders = get_posts( array(
                 'posts_per_page' => $limit,
@@ -125,14 +129,21 @@ class WCSExport{
 				'date_query' => $dateArray,
             ) );	*/
 			$query = "Select ID, post_status from ".$wpdb->prefix."posts where post_type='shop_order' ";
+			$queryMaxItems = "Select count(*) as cnt from ".$wpdb->prefix."posts as posts, ".$wpdb->prefix."woocommerce_order_items as items where posts.post_type='shop_order' ";
 			if( $orderStatus != "" )
 				$query .= "and find_in_set(post_status,'".implode(",",$orderStatus)."')  ";
+            $queryMaxItems .= "and find_in_set(posts.post_status,'".implode(",",$orderStatus)."')  ";
 			if( $arrParams['start_date'] != '' || $arrParams['end_date'] != '' ){
 				$query .= $datequery;
+                $queryMaxItems .= $datequeryMaxItems;
 			}
 			if( $arrParams['orders_option'] !='' && $arrParams['orders_id'] !='' && is_numeric($arrParams['orders_id']) ){
-				$query .= "and ID ".$arrParams['orders_option']." ".$arrParams['orders_id']." ";	
+				$query .= "and ID ".$arrParams['orders_option']." ".$arrParams['orders_id']." ";
+                $queryMaxItems .= "and posts.ID ".$arrParams['orders_option']." ".$arrParams['orders_id']." ";
 			}
+
+            $queryMaxItems .= " AND items.order_id = posts.ID AND items.order_item_type = 'line_item' GROUP BY items.order_id ORDER BY cnt DESC LIMIT 1";
+
 			if( $offset > 0 || $limit > 0 ){
 				if( $offset > 0 && $limit < 0 ){
 					$query .= "limit $offset, 5000";
@@ -141,11 +152,23 @@ class WCSExport{
 				}
 			}
 			
-			$orders = $wpdb->get_results( $wpdb->prepare( $query, "" ) );						
-			
+			//$orders = $wpdb->get_results( $wpdb->prepare( $query, "" ) );
+            /*Commented the above line: as we got warning <b>Notice</b>:  wpdb::prepare was called <strong>incorrectly</strong>. The query argument of wpdb::prepare() must have a placeholder. Please see <a href="https://codex.wordpress.org/Debugging_in_WordPress">Debugging in WordPress</a> for more information. (This message was added in version 3.9.) in <b>/var/www/html/wordpress_test/wp-includes/functions.php</b> on line <b>3622</b><br />*/
+			$orders = $wpdb->get_results($query);
+			$maxItemCount = $wpdb->get_var($queryMaxItems);
+
+			$ordersTotal = $wpdb->get_results($queryMaxItems);
+            $orderItemsCol = array();
+            for($i=1; $i<=$maxItemCount; $i++){
+                $orderItemsCol[] = 'order_item_'.$i;
+            }
+
+
             $arrRows = array();
-            $arrRows[] = array(
+            $arrFirstRow = array(
                 'order_id',
+                'order_number_formatted',
+                'order_number',
                 'date',
                 'status',
 
@@ -187,14 +210,24 @@ class WCSExport{
 
                 'customer_note',
 
-                'order_items',
+                /*'order_items',*/
 
+                /*'download_permissions_granted',
+                'order_notes',
+                'shipping_method_1',
+                'shipping_cost_1',
+                'shipment_tracking',*/
+
+            );
+            $orderHeaderAppend = array(
+                'download_permissions_granted',
                 'order_notes',
                 'shipping_method_1',
                 'shipping_cost_1',
                 'shipment_tracking',
-
             );
+            $arrRows[] = array_merge_recursive($arrFirstRow, $orderItemsCol, $orderHeaderAppend);
+
             foreach($orders as $order){
                 if(empty($order->ID)){
                     continue;
@@ -269,6 +302,9 @@ class WCSExport{
                 $orderItemsArr = $orderDetails->get_items();
                 if(!empty($orderItemsArr)){
                     $itemHtml = array();
+                    $itemValOld = array();
+                    $totalItemsForOrder = 0;
+
                     foreach($orderItemsArr as $itemDetails){
                         $pid = !empty($itemDetails['variation_id'])?$itemDetails['variation_id']:$itemDetails['product_id'];
                         $product = new WC_Product($pid);
@@ -278,15 +314,27 @@ class WCSExport{
                             "Qty: ".$itemDetails['qty'],
                             "Total: ".$itemDetails['line_total'],
                         );
+                        $itemValArr = array(
+                            $product->get_sku(),
+                            $itemDetails['qty'],
+                            $itemDetails['line_total'],
+                        );
                         $itemHtml[] = implode('|', $itemHtmlArr);
+                        $itemValOld[] = implode('|', $itemValArr);
+                        $totalItemsForOrder++;
+                    }
+
+                    for($i=$totalItemsForOrder; $i<=$maxItemCount; $i++){
+                        $itemValOld[] = '';
                     }
 
                     $orderItemHtml = implode("\n", $itemHtml);
                 }
 
-                $orderItems = array(
+                /*$orderItems = array(
                     $orderItemHtml
-                );
+                );*/
+                $orderItems = $itemValOld;
 
                 $sm = $orderDetails->get_items( 'shipping' );
                 $smK = '';
@@ -301,9 +349,12 @@ class WCSExport{
 				$orderAppendDetailsVal = '';											
 				if( is_array( $orderDetails->get_customer_order_notes() ) ){
 					$orderAppendDetailsArray = $orderDetails->get_customer_order_notes();
-					$orderAppendDetailsVal = $orderAppendDetailsArray[0]->comment_content;					
+					$orderAppendDetailsVal = !empty($orderAppendDetailsArray[0]->comment_content)?$orderAppendDetailsArray[0]->comment_content:'';
 				}
+
+                $download_permissions_granted = 1;
                 $orderAppendDetails = array(
+                    $download_permissions_granted,
                     $orderAppendDetailsVal,
                     $smK,
                     $smC,
@@ -312,9 +363,12 @@ class WCSExport{
 
                 $rw = array(
                     $order->ID,
+                    '',
+                    '',
                     $orderDetails->order_date,
                     $wcOrderStatus[$order->post_status],
                 );
+
 
                 $rw = array_merge_recursive($rw,$calculationDetails,$paymentDetails,$customerDetails, $billingDetails, $shippingDetails, $customerNote, $orderItems, $orderAppendDetails);
 
