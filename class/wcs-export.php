@@ -289,9 +289,9 @@ class WCSExport{
                     $orderDetails->shipping_last_name,
                     $orderDetails->shipping_address_1,
                     $orderDetails->shipping_address_2,
+                    $orderDetails->shipping_postcode,
                     $orderDetails->shipping_city,
                     $orderDetails->shipping_state,
-                    $orderDetails->shipping_postcode,
                     $orderDetails->shipping_country,
                     $orderDetails->shipping_company,
                 );
